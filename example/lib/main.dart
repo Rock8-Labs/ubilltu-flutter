@@ -27,7 +27,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final _slug = TextEditingController(text: 'your-store-slug');
+  final _slug = TextEditingController(text: 'democompany-e6226f1b');
   final _email = TextEditingController();
   final _password = TextEditingController();
 
@@ -53,31 +53,39 @@ class _HomePageState extends State<HomePage> {
       ..showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  String _msg(UbilltuException e) => e is UbilltuApiException
+      ? 'API ${e.statusCode}: ${e.message}'
+      : e.message;
+
   Future<void> _login() async {
     FocusScope.of(context).unfocus();
     setState(() => _loading = true);
     final client = UbilltuClient(storefrontSlug: _slug.text.trim());
     try {
       await client.login(_email.text.trim(), _password.text);
-      final plans = await client.listPlans();
-      final subs = await client.listSubscriptions();
-      if (!mounted) return;
-      setState(() {
-        _client = client;
-        _loggedIn = true;
-        _plans = plans.items;
-        _subs = subs.items;
-      });
-      _snack('Signed in — ${plans.total} plans, ${subs.total} subscriptions');
-    } on UbilltuApiException catch (e) {
-      _snack('API ${e.statusCode}: ${e.message}');
+      _client = client;
+      await _refresh();
+      if (mounted) setState(() => _loggedIn = true);
+      _snack('Signed in');
     } on UbilltuException catch (e) {
-      _snack(e.message);
+      _snack(_msg(e));
     } catch (e) {
       _snack('Error: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _refresh() async {
+    final client = _client;
+    if (client == null) return;
+    final plans = await client.listPlans();
+    final subs = await client.listSubscriptions();
+    if (!mounted) return;
+    setState(() {
+      _plans = plans.items;
+      _subs = subs.items;
+    });
   }
 
   void _logout() {
@@ -87,6 +95,169 @@ class _HomePageState extends State<HomePage> {
       _plans = const [];
       _subs = const [];
     });
+  }
+
+  /// Run a write action, then refresh + report.
+  Future<void> _run(String label, Future<void> Function() action) async {
+    setState(() => _loading = true);
+    try {
+      await action();
+      await _refresh();
+      _snack('$label ✓');
+    } on UbilltuException catch (e) {
+      _snack(_msg(e));
+    } catch (e) {
+      _snack('Error: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<Plan?> _pickPlan(String title) {
+    return showDialog<Plan>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(title),
+        children: _plans
+            .map(
+              (p) => SimpleDialogOption(
+                onPressed: () => Navigator.pop(ctx, p),
+                child: Text('${p.name}    ${p.currency ?? ''}${p.price ?? ''}'),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
+  Future<String?> _pickPolicy() {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Apply when?'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'END_OF_TERM'),
+            child: const Text('End of term (no proration)'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'IMMEDIATE'),
+            child: const Text('Immediately (prorated)'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _preview(Subscription sub) async {
+    final plan = await _pickPlan('Preview change to…');
+    if (plan == null || _client == null) return;
+    setState(() => _loading = true);
+    try {
+      final dry = await _client!.previewChange(sub.id, newPlan: plan.id);
+      if (!mounted) return;
+      final amount = dry['amount'] ?? dry['total'] ?? dry['balance'] ?? dry;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Dry-run preview'),
+          content: Text('Change to ${plan.name}\n\nProjected: $amount'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } on UbilltuException catch (e) {
+      _snack(_msg(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _changePlan(Subscription sub) async {
+    final plan = await _pickPlan('Change to…');
+    if (plan == null) return;
+    final policy = await _pickPolicy();
+    if (policy == null) return;
+    await _run(
+      'Plan changed',
+      () => _client!.changePlan(sub.id, plan.id, policy: policy),
+    );
+  }
+
+  void _openActions(Subscription sub) {
+    final client = _client!;
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) {
+        void act(Future<void> Function() run) {
+          Navigator.pop(ctx);
+          run();
+        }
+
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                title: Text(sub.planName ?? sub.id),
+                subtitle: Text('State: ${sub.state ?? '—'}'),
+              ),
+              const Divider(height: 0),
+              ListTile(
+                leading: const Icon(Icons.calculate_outlined),
+                title: const Text('Preview change'),
+                onTap: () => act(() => _preview(sub)),
+              ),
+              ListTile(
+                leading: const Icon(Icons.swap_horiz),
+                title: const Text('Change plan'),
+                onTap: () => act(() => _changePlan(sub)),
+              ),
+              ListTile(
+                leading: const Icon(Icons.pause),
+                title: const Text('Pause'),
+                onTap: () => act(
+                  () => _run('Paused', () => client.pauseSubscription(sub.id)),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.play_arrow),
+                title: const Text('Resume'),
+                onTap: () => act(
+                  () =>
+                      _run('Resumed', () => client.resumeSubscription(sub.id)),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.restart_alt),
+                title: const Text('Reactivate'),
+                onTap: () => act(
+                  () => _run(
+                    'Reactivated',
+                    () => client.reactivateSubscription(sub.id),
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.cancel_outlined),
+                iconColor: Colors.red,
+                textColor: Colors.red,
+                title: const Text('Cancel'),
+                onTap: () => act(
+                  () => _run(
+                    'Cancelled',
+                    () => client.cancelSubscription(sub.id),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -148,7 +319,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildDashboard(BuildContext context) {
     return RefreshIndicator(
-      onRefresh: _login,
+      onRefresh: _refresh,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -169,13 +340,19 @@ class _HomePageState extends State<HomePage> {
             'My subscriptions',
             style: Theme.of(context).textTheme.titleLarge,
           ),
+          const Text(
+            'Tap a subscription to manage it',
+            style: TextStyle(color: Colors.grey),
+          ),
           const SizedBox(height: 8),
           if (_subs.isEmpty) const Text('No subscriptions.'),
           ..._subs.map(
             (s) => Card(
               child: ListTile(
                 title: Text(s.planName ?? s.id),
+                subtitle: Text(s.id),
                 trailing: Text(s.state ?? ''),
+                onTap: () => _openActions(s),
               ),
             ),
           ),
