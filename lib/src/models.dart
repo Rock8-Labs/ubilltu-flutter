@@ -91,3 +91,17 @@ class Invoice {
 
   factory Invoice.fromJson(Map<String, dynamic> json) => Invoice(json);
 }
+
+/// A payment record.
+class Payment {
+  Payment(this.raw);
+
+  final Map<String, dynamic> raw;
+
+  String get id => (raw['payment_id'] ?? raw['id'] ?? '').toString();
+  num? get amount => (raw['amount'] ?? raw['purchased_amount']) as num?;
+  String? get currency => raw['currency'] as String?;
+  String? get status => (raw['status'] ?? raw['state']) as String?;
+
+  factory Payment.fromJson(Map<String, dynamic> json) => Payment(json);
+}

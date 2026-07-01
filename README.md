@@ -71,13 +71,14 @@ try {
 
 | Area | Methods |
 |------|---------|
-| Auth | `login`, `register`, `refresh`, `logout`, `me`, `account`, `restoreSession` |
+| Auth | `login`, `register`, `refresh`, `logout`, `me`, `restoreSession` |
+| Account | `account`, `updateAccount`, `balance`, `usage`, `listPayments` |
 | Plans | `listPlans`, `getPlan` |
-| Subscriptions | `listSubscriptions`, `getSubscription`, `subscribe`, `cancelSubscription`, `pauseSubscription`, `resumeSubscription`, `reactivateSubscription` |
-| Invoices | `listInvoices` |
+| Subscriptions | `listSubscriptions`, `getSubscription`, `subscribe`, `changePlan`, `previewChange`, `cancelSubscription`, `pauseSubscription`, `resumeSubscription`, `reactivateSubscription` |
+| Invoices | `listInvoices`, `getInvoice`, `invoicePdf` |
 
-Typed models (`Plan`, `Subscription`, `Invoice`) expose common fields plus a
-`.raw` map for anything not surfaced as a getter.
+Typed models (`Plan`, `Subscription`, `Invoice`, `Payment`) expose common fields
+plus a `.raw` map for anything not surfaced as a getter.
 
 ## Development
 

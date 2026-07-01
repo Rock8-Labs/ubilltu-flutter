@@ -88,6 +88,20 @@ class UbilltuClient {
   /// The authenticated subscriber's account details.
   Future<Map<String, dynamic>> account() => _get('/api/v1/account');
 
+  /// Update the subscriber's profile fields (e.g. `name`, `phone`).
+  Future<Map<String, dynamic>> updateAccount(Map<String, dynamic> fields) =>
+      _put('/api/v1/account', fields);
+
+  /// The subscriber's account balance.
+  Future<Map<String, dynamic>> balance() => _get('/api/v1/account/balance');
+
+  /// The subscriber's usage metrics.
+  Future<Map<String, dynamic>> usage() => _get('/api/v1/account/usage');
+
+  /// The subscriber's payment history.
+  Future<Page<Payment>> listPayments() async =>
+      Page.fromJson(await _get('/api/v1/account/payments'), Payment.fromJson);
+
   // --------------------------------------------------------------- Plans ----
 
   /// List available plans from the tenant catalog.
@@ -143,11 +157,48 @@ class UbilltuClient {
         await _post('/api/v1/subscriptions/$id/reactivate', const {}),
       );
 
+  /// Change a subscription's plan (upgrade / downgrade / change billing period).
+  ///
+  /// [newPlanId] is the target plan name — the billing period is encoded in it
+  /// (e.g. `premium-annual`). [policy] defaults to `END_OF_TERM` (deferred, no
+  /// proration); pass `IMMEDIATE` to apply the change now.
+  Future<Subscription> changePlan(
+    String id,
+    String newPlanId, {
+    String policy = 'END_OF_TERM',
+    String? priceList,
+    String? effectiveDate,
+  }) async {
+    final data = await _put('/api/v1/subscriptions/$id', {
+      'plan_id': newPlanId,
+      'billing_policy': policy,
+      if (priceList != null) 'price_list': priceList,
+      if (effectiveDate != null) 'effective_date': effectiveDate,
+    });
+    return Subscription.fromJson(data);
+  }
+
+  /// Preview the pro-rata invoice for a plan change before committing to it.
+  /// Pass [newPlan] to preview switching to that plan.
+  Future<Map<String, dynamic>> previewChange(String id, {String? newPlan}) {
+    final q =
+        newPlan != null ? '?new_plan=${Uri.encodeQueryComponent(newPlan)}' : '';
+    return _get('/api/v1/subscriptions/$id/dry-run$q');
+  }
+
   // ------------------------------------------------------------ Invoices ----
 
   /// List the subscriber's invoices.
   Future<Page<Invoice>> listInvoices() async =>
       Page.fromJson(await _get('/api/v1/invoices'), Invoice.fromJson);
+
+  /// Fetch a single invoice with line-item detail.
+  Future<Map<String, dynamic>> getInvoice(String invoiceId) =>
+      _get('/api/v1/invoices/$invoiceId');
+
+  /// Download an invoice as PDF bytes.
+  Future<List<int>> invoicePdf(String invoiceId) =>
+      _getBytes('/api/v1/invoices/$invoiceId/pdf');
 
   /// Release the underlying HTTP client. Call when the client is no longer used.
   void close() => _http.close();
@@ -185,6 +236,27 @@ class UbilltuClient {
       body: jsonEncode(body),
     );
     return _decode(res);
+  }
+
+  Future<Map<String, dynamic>> _put(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final res = await _http.put(
+      Uri.parse('$baseUrl$path'),
+      headers: _headers(json: true),
+      body: jsonEncode(body),
+    );
+    return _decode(res);
+  }
+
+  Future<List<int>> _getBytes(String path) async {
+    final res =
+        await _http.get(Uri.parse('$baseUrl$path'), headers: _headers());
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      _decode(res); // throws UbilltuApiException
+    }
+    return res.bodyBytes;
   }
 
   Future<void> _delete(String path) async {

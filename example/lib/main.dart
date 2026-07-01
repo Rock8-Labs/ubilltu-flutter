@@ -102,8 +102,8 @@ class _HomePageState extends State<HomePage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _loggedIn
-              ? _buildDashboard(context)
-              : _buildLogin(context),
+          ? _buildDashboard(context)
+          : _buildLogin(context),
     );
   }
 
@@ -165,8 +165,10 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           const SizedBox(height: 24),
-          Text('My subscriptions',
-              style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            'My subscriptions',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
           const SizedBox(height: 8),
           if (_subs.isEmpty) const Text('No subscriptions.'),
           ..._subs.map(
