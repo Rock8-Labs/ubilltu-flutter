@@ -1,3 +1,9 @@
+## 0.2.1
+
+- Fix `Plan` parsing against the real API: name from `product_name`, price/currency from the `prices[]` array (were coming back as the slug / null).
+- `register` now sends the required `tos_accepted` field.
+- Error messages parsed from the API's `{"error": {"message": …}}` shape.
+
 ## 0.2.0
 
 - Subscriptions: `changePlan` (upgrade/downgrade/period change) + `previewChange` (dry-run pro-rata preview).

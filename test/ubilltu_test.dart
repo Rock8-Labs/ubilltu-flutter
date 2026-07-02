@@ -51,7 +51,10 @@ void main() {
         if (req.url.path == '/api/v1/auth/login') {
           return _json({'access_token': 't'});
         }
-        return _json({'detail': 'no active subscription'}, 402);
+        // The API nests error messages as {"error": {"message": ...}}.
+        return _json({
+          'error': {'message': 'no active subscription'},
+        }, 402);
       });
       final client = UbilltuClient(storefrontSlug: 'demo', httpClient: mock);
       await client.login('a@b.com', 'pw');
@@ -64,14 +67,24 @@ void main() {
       );
     });
 
-    test('parses a plans page into typed Plan models', () async {
+    test('parses a plans page using the real API shape', () async {
       final mock = MockClient((req) async {
         if (req.url.path == '/api/v1/auth/login') {
           return _json({'access_token': 't'});
         }
+        // Mirrors the real /plans payload: slug in plan_name, display in
+        // product_name, price/currency inside prices[].
         return _json({
           'items': [
-            {'name': 'premium-monthly', 'price': 149, 'currency': 'ZAR'},
+            {
+              'plan_id': 'lite-monthly',
+              'plan_name': 'lite-monthly',
+              'product_name': 'Lite',
+              'billing_period': 'MONTHLY',
+              'prices': [
+                {'currency': 'ZAR', 'amount': 50, 'billing_period': 'MONTHLY'},
+              ],
+            },
           ],
           'total': 1,
           'page': 1,
@@ -81,10 +94,26 @@ void main() {
       final client = UbilltuClient(storefrontSlug: 'demo', httpClient: mock);
       await client.login('a@b.com', 'pw');
 
-      final plans = await client.listPlans();
-      expect(plans.items.single.name, 'premium-monthly');
-      expect(plans.items.single.price, 149);
-      expect(plans.items.single.currency, 'ZAR');
+      final plan = (await client.listPlans()).items.single;
+      expect(plan.id, 'lite-monthly'); // slug — used for subscribe()
+      expect(plan.name, 'Lite'); // product display name
+      expect(plan.price, 50); // from prices[]
+      expect(plan.currency, 'ZAR'); // from prices[]
+      expect(plan.billingPeriod, 'MONTHLY');
+    });
+
+    test('register sends tos_accepted', () async {
+      http.Request? captured;
+      final mock = MockClient((req) async {
+        captured = req;
+        return _json({'access_token': 't'});
+      });
+      final client = UbilltuClient(storefrontSlug: 'demo', httpClient: mock);
+      await client.register(email: 'new@example.com', password: 'password123');
+
+      final body = jsonDecode(captured!.body) as Map<String, dynamic>;
+      expect(body['tos_accepted'], true);
+      expect(body['email'], 'new@example.com');
     });
 
     test('changePlan sends a PUT with plan_id + billing_policy', () async {

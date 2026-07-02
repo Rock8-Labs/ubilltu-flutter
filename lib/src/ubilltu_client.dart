@@ -55,14 +55,23 @@ class UbilltuClient {
   }
 
   /// Register a new subscriber. Stores the session if the API returns tokens.
+  ///
+  /// The API requires `tos_accepted` (the caller's user must accept the Terms of
+  /// Service); it defaults to `true` here for convenience.
   Future<UbilltuTokens> register({
     required String email,
     required String password,
     String? name,
+    bool tosAccepted = true,
   }) async {
     final data = await _post(
       '/api/v1/auth/register',
-      {'email': email, 'password': password, if (name != null) 'name': name},
+      {
+        'email': email,
+        'password': password,
+        'tos_accepted': tosAccepted,
+        if (name != null) 'name': name,
+      },
       auth: false,
     );
     final tokens = UbilltuTokens.fromJson(data);
@@ -279,7 +288,9 @@ class UbilltuClient {
       }
     }
     if (!ok) {
-      final msg = parsed?['detail']?.toString() ??
+      final err = parsed?['error'];
+      final msg = (err is Map ? err['message']?.toString() : null) ??
+          parsed?['detail']?.toString() ??
           parsed?['message']?.toString() ??
           res.reasonPhrase ??
           'Request failed';

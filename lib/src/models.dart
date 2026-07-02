@@ -53,13 +53,28 @@ class Plan {
 
   final Map<String, dynamic> raw;
 
+  // The API returns price/currency inside a `prices[]` array and the display
+  // name in `product_name`; fall back to flat fields for safety.
+  Map<String, dynamic> get _firstPrice {
+    final prices = raw['prices'];
+    if (prices is List && prices.isNotEmpty && prices.first is Map) {
+      return (prices.first as Map).cast<String, dynamic>();
+    }
+    return const {};
+  }
+
   String get id =>
-      (raw['id'] ?? raw['plan_id'] ?? raw['name'] ?? '').toString();
-  String get name => (raw['name'] ?? raw['plan_name'] ?? '').toString();
-  num? get price => (raw['price'] ?? raw['amount']) as num?;
-  String? get currency => raw['currency'] as String?;
-  String? get billingPeriod =>
-      (raw['billing_period'] ?? raw['billingPeriod']) as String?;
+      (raw['plan_id'] ?? raw['id'] ?? raw['plan_name'] ?? raw['name'] ?? '')
+          .toString();
+  String get name =>
+      (raw['product_name'] ?? raw['plan_name'] ?? raw['name'] ?? '').toString();
+  num? get price =>
+      (raw['price'] ?? raw['amount'] ?? _firstPrice['amount']) as num?;
+  String? get currency =>
+      (raw['currency'] ?? _firstPrice['currency']) as String?;
+  String? get billingPeriod => (raw['billing_period'] ??
+      raw['billingPeriod'] ??
+      _firstPrice['billing_period']) as String?;
 
   factory Plan.fromJson(Map<String, dynamic> json) => Plan(json);
 }
