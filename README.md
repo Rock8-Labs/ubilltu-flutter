@@ -11,9 +11,10 @@ dependencies:
   ubilltu:
     git:
       url: https://github.com/Rock8-Labs/ubilltu-flutter
+      ref: v0.1.0
 ```
 
-(Published on pub.dev — TBD.)
+(Coming to pub.dev — until then, install from git as above.)
 
 ## Usage
 

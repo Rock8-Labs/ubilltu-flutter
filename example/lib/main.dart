@@ -27,7 +27,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final _slug = TextEditingController(text: 'democompany-e6226f1b');
+  final _slug = TextEditingController(text: 'your-store-slug');
   final _email = TextEditingController();
   final _password = TextEditingController();
 
