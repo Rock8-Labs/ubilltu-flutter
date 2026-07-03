@@ -1,3 +1,7 @@
+## 0.2.2
+
+- Fix `getSubscription`: unwrap the detail endpoint's `{subscription, events}` shape so `state`/`planName` parse (the list returns it flat; the detail nests it).
+
 ## 0.2.1
 
 - Fix `Plan` parsing against the real API: name from `product_name`, price/currency from the `prices[]` array (were coming back as the slug / null).

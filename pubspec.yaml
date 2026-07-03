@@ -2,7 +2,7 @@ name: ubilltu
 description: >-
   Official Dart / Flutter client for the ubilltu subscription commerce API —
   authenticate subscribers, browse plans, and manage subscriptions.
-version: 0.2.1
+version: 0.2.2
 repository: https://github.com/Rock8-Labs/ubilltu-flutter
 
 environment:

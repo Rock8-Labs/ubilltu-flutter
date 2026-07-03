@@ -85,9 +85,16 @@ class Subscription {
 
   final Map<String, dynamic> raw;
 
-  String get id => (raw['subscription_id'] ?? raw['id'] ?? '').toString();
-  String? get planName => (raw['plan_name'] ?? raw['planName']) as String?;
-  String? get state => (raw['state'] ?? raw['status']) as String?;
+  // The detail endpoint wraps it as {"subscription": {...}, "events": [...]};
+  // the list returns it flat. Unwrap so both shapes parse.
+  Map<String, dynamic> get _sub {
+    final s = raw['subscription'];
+    return s is Map ? s.cast<String, dynamic>() : raw;
+  }
+
+  String get id => (_sub['subscription_id'] ?? _sub['id'] ?? '').toString();
+  String? get planName => (_sub['plan_name'] ?? _sub['planName']) as String?;
+  String? get state => (_sub['state'] ?? _sub['status']) as String?;
 
   factory Subscription.fromJson(Map<String, dynamic> json) =>
       Subscription(json);

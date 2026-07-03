@@ -116,6 +116,30 @@ void main() {
       expect(body['email'], 'new@example.com');
     });
 
+    test('getSubscription unwraps the detail {subscription, events} shape',
+        () async {
+      final mock = MockClient((req) async {
+        if (req.url.path == '/api/v1/auth/login') {
+          return _json({'access_token': 't'});
+        }
+        return _json({
+          'subscription': {
+            'subscription_id': 'sub_1',
+            'plan_name': 'premium-monthly',
+            'state': 'ACTIVE',
+          },
+          'events': <dynamic>[],
+        });
+      });
+      final client = UbilltuClient(storefrontSlug: 'demo', httpClient: mock);
+      await client.login('a@b.com', 'pw');
+
+      final s = await client.getSubscription('sub_1');
+      expect(s.id, 'sub_1');
+      expect(s.planName, 'premium-monthly');
+      expect(s.state, 'ACTIVE');
+    });
+
     test('changePlan sends a PUT with plan_id + billing_policy', () async {
       http.Request? captured;
       final mock = MockClient((req) async {
