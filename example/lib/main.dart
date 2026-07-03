@@ -75,6 +75,26 @@ class _HomePageState extends State<HomePage> {
       ? 'API ${e.statusCode}: ${e.message}'
       : e.message;
 
+  /// Friendly label for the raw subscription state. Note: pause is scheduled for
+  /// the end of the billing period, so a just-paused sub stays ACTIVE until then
+  /// and only reports BLOCKED once the pause actually takes effect.
+  String _stateLabel(String? state) {
+    switch (state) {
+      case 'ACTIVE':
+        return 'Active';
+      case 'BLOCKED':
+        return 'Paused';
+      case 'PENDING':
+        return 'Pending';
+      case 'CANCELLED':
+        return 'Cancelled';
+      case 'EXPIRED':
+        return 'Expired';
+      default:
+        return state ?? '';
+    }
+  }
+
   // --------------------------------------------------------------- auth ----
 
   Future<void> _authenticate({required bool register}) async {
@@ -352,7 +372,7 @@ class _HomePageState extends State<HomePage> {
             children: [
               ListTile(
                 title: Text(sub.planName ?? sub.id),
-                subtitle: Text('State: ${sub.state ?? '—'}'),
+                subtitle: Text('State: ${_stateLabel(sub.state)}'),
               ),
               const Divider(height: 0),
               ListTile(
@@ -549,7 +569,7 @@ class _HomePageState extends State<HomePage> {
                 child: ListTile(
                   title: Text(s.planName ?? s.id),
                   subtitle: Text(s.id),
-                  trailing: Text(s.state ?? ''),
+                  trailing: Text(_stateLabel(s.state)),
                   onTap: () => _openActions(s),
                 ),
               )),
