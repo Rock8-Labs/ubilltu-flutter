@@ -514,6 +514,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildDashboard(BuildContext context) {
+    // A storefront normally shouldn't let a customer stack multiple base plans
+    // (each Buy = a new signup = another subscription). Once they have a live
+    // sub, disable Buy and steer them to Change plan instead.
+    final hasActiveSub =
+        _subs.any((s) => s.state == 'ACTIVE' || s.state == 'PENDING');
     return RefreshIndicator(
       onRefresh: _refresh,
       child: ListView(
@@ -541,6 +546,15 @@ class _HomePageState extends State<HomePage> {
 
           // ---- Plans ----
           _sectionTitle('Plans'),
+          if (hasActiveSub)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'You already have an active subscription — tap it below to '
+                'Change plan instead of buying another.',
+                style: TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+            ),
           if (_plans.isEmpty) const Text('No plans.'),
           ..._plans.map((p) => Card(
                 child: ListTile(
@@ -552,7 +566,8 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       Text('${p.currency ?? ''}${p.price ?? ''}'),
                       FilledButton.tonal(
-                        onPressed: () => _buy(p),
+                        // Disabled when they already have a live subscription.
+                        onPressed: hasActiveSub ? null : () => _buy(p),
                         child: const Text('Buy'),
                       ),
                     ],
