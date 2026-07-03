@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ubilltu/ubilltu.dart';
-import 'package:url_launcher/url_launcher.dart';
+
+import 'payment_webview.dart';
 
 void main() => runApp(const UbilltuExampleApp());
 
@@ -161,14 +162,23 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _launch(String? url, {String? emptyMsg}) async {
+  /// Open the hosted-checkout page in an in-app WebView. It closes itself when
+  /// the flow returns to the storefront return_url; we then refresh so the new
+  /// card / subscription / payment shows up.
+  Future<void> _openPayment(String? url, {String? emptyMsg}) async {
     if (url == null || url.isEmpty) {
-      _snack(emptyMsg ?? 'No redirect URL returned');
+      _snack(emptyMsg ?? 'No payment page returned');
+      await _refresh();
       return;
     }
-    final ok = await launchUrl(Uri.parse(url),
-        mode: LaunchMode.externalApplication);
-    if (!ok) _snack('Could not open $url');
+    final completed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) =>
+            PaymentWebView(url: url, returnUrlPrefix: _returnUrl),
+      ),
+    );
+    _snack(completed == true ? 'Payment flow returned — refreshing' : 'Closed');
+    await _refresh();
   }
 
   Future<bool> _confirm(String title, String body) async =>
@@ -197,28 +207,31 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     setState(() => _loading = true);
+    Map<String, dynamic>? r;
     try {
-      final r = await _client!.signup(plan.id, _returnUrl);
-      await _refresh();
-      await _launch(r['redirect_url'] as String?,
-          emptyMsg: 'Subscribed (no payment page returned)');
+      r = await _client!.signup(plan.id, _returnUrl);
     } on UbilltuException catch (e) {
       _snack(_msg(e));
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+    if (r != null) {
+      await _openPayment(r['redirect_url'] as String?,
+          emptyMsg: 'Subscribed (no payment page returned)');
     }
   }
 
   Future<void> _addCard() async {
     setState(() => _loading = true);
+    Map<String, dynamic>? r;
     try {
-      final r = await _client!.setupPaymentMethod(_returnUrl);
-      await _launch(r['redirect_url'] as String?);
+      r = await _client!.setupPaymentMethod(_returnUrl);
     } on UbilltuException catch (e) {
       _snack(_msg(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    if (r != null) await _openPayment(r['redirect_url'] as String?);
   }
 
   Future<void> _payInvoice(Invoice inv) async {
@@ -228,15 +241,16 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     setState(() => _loading = true);
+    Map<String, dynamic>? r;
     try {
-      final r = await _client!.checkout(amount,
+      r = await _client!.checkout(amount,
           currency: inv.currency ?? 'ZAR', invoiceId: inv.id);
-      await _launch(r['redirect_url'] as String?);
     } on UbilltuException catch (e) {
       _snack(_msg(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    if (r != null) await _openPayment(r['redirect_url'] as String?);
   }
 
   Future<void> _openPdf(Invoice inv) async {
