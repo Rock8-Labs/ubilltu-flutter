@@ -140,6 +140,68 @@ void main() {
       expect(s.state, 'ACTIVE');
     });
 
+    test('subscription surfaces productName + price', () async {
+      final mock = MockClient((req) async {
+        if (req.url.path == '/api/v1/auth/login') {
+          return _json({'access_token': 't'});
+        }
+        return _json({
+          'items': [
+            {
+              'subscription_id': 'sub_1',
+              'plan_name': 'lite-monthly',
+              'product_name': 'Lite',
+              'state': 'ACTIVE',
+              'price': 50,
+              'currency': 'ZAR',
+            },
+          ],
+          'total': 1,
+          'page': 1,
+          'per_page': 20,
+        });
+      });
+      final client = UbilltuClient(storefrontSlug: 'demo', httpClient: mock);
+      await client.login('a@b.com', 'pw');
+      final s = (await client.listSubscriptions()).items.single;
+      expect(s.productName, 'Lite');
+      expect(s.price, 50);
+      expect(s.currency, 'ZAR');
+    });
+
+    test('signup + setupPaymentMethod post the right bodies', () async {
+      http.Request? captured;
+      final mock = MockClient((req) async {
+        if (req.url.path == '/api/v1/auth/login') {
+          return _json({'access_token': 't'});
+        }
+        captured = req;
+        if (req.url.path.endsWith('/signup')) {
+          return _json({
+            'subscription_id': 'sub_1',
+            'redirect_url': 'https://pay/abc',
+          });
+        }
+        return _json({'redirect_url': 'https://pay/setup'});
+      });
+      final client = UbilltuClient(storefrontSlug: 'demo', httpClient: mock);
+      await client.login('a@b.com', 'pw');
+
+      final su = await client.signup('lite-monthly', 'https://app/return');
+      expect(su['redirect_url'], 'https://pay/abc');
+      var body = jsonDecode(captured!.body) as Map<String, dynamic>;
+      expect(body['plan_id'], 'lite-monthly');
+
+      final setup = await client.setupPaymentMethod(
+        'https://app/return',
+        isDefault: true,
+      );
+      expect(setup['redirect_url'], 'https://pay/setup');
+      body = jsonDecode(captured!.body) as Map<String, dynamic>;
+      expect(body['return_url'], 'https://app/return');
+      expect(body['is_default'], true);
+    });
+
     test('changePlan sends a PUT with plan_id + billing_policy', () async {
       http.Request? captured;
       final mock = MockClient((req) async {

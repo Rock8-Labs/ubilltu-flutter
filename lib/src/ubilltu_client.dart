@@ -209,6 +209,47 @@ class UbilltuClient {
   Future<List<int>> invoicePdf(String invoiceId) =>
       _getBytes('/api/v1/invoices/$invoiceId/pdf');
 
+  // -------------------------------------------------------------- Payments --
+
+  /// List the subscriber's saved payment methods (cards on file).
+  Future<Page<PaymentMethod>> listPaymentMethods() async => Page.fromJson(
+        await _get('/api/v1/payments/methods'),
+        PaymentMethod.fromJson,
+      );
+
+  /// Start a zero-amount card-on-file setup. Returns `{redirect_url}` — send the
+  /// customer to that hosted page to enter their card.
+  Future<Map<String, dynamic>> setupPaymentMethod(
+    String returnUrl, {
+    bool isDefault = false,
+  }) =>
+      _post('/api/v1/payments/methods/setup', {
+        'return_url': returnUrl,
+        'is_default': isDefault,
+      });
+
+  /// Subscribe to a plan AND start payment collection in one call. Returns
+  /// `{subscription_id, payment_id, redirect_url}` — the subscription exists
+  /// immediately; send the customer to `redirect_url` to pay the first invoice.
+  Future<Map<String, dynamic>> signup(String planId, String returnUrl) => _post(
+        '/api/v1/subscriptions/signup',
+        {'plan_id': planId, 'return_url': returnUrl},
+      );
+
+  /// Start a hosted checkout for an amount. Returns `{payment_id, redirect_url}`.
+  Future<Map<String, dynamic>> checkout(
+    num amount, {
+    String currency = 'ZAR',
+    String? invoiceId,
+    String? subscriptionId,
+  }) =>
+      _post('/api/v1/payments/checkout', {
+        'amount': amount,
+        'currency': currency,
+        if (invoiceId != null) 'invoice_id': invoiceId,
+        if (subscriptionId != null) 'subscription_id': subscriptionId,
+      });
+
   /// Release the underlying HTTP client. Call when the client is no longer used.
   void close() => _http.close();
 

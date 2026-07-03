@@ -77,6 +77,7 @@ try {
 | Plans | `listPlans`, `getPlan` |
 | Subscriptions | `listSubscriptions`, `getSubscription`, `subscribe`, `changePlan`, `previewChange`, `cancelSubscription`, `pauseSubscription`, `resumeSubscription`, `reactivateSubscription` |
 | Invoices | `listInvoices`, `getInvoice`, `invoicePdf` |
+| Payments | `listPaymentMethods`, `setupPaymentMethod`, `signup`, `checkout` |
 
 Typed models (`Plan`, `Subscription`, `Invoice`, `Payment`) expose common fields
 plus a `.raw` map for anything not surfaced as a getter.

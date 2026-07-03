@@ -1,3 +1,8 @@
+## 0.3.0
+
+- Payments: `listPaymentMethods`, `setupPaymentMethod` (hosted card-on-file), `signup` (subscribe + checkout redirect), `checkout`. New `PaymentMethod` model.
+- `Subscription` now surfaces `productName` (display name), `price`, `currency`.
+
 ## 0.2.2
 
 - Fix `getSubscription`: unwrap the detail endpoint's `{subscription, events}` shape so `state`/`planName` parse (the list returns it flat; the detail nests it).

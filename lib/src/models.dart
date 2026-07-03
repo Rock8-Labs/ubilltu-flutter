@@ -94,7 +94,11 @@ class Subscription {
 
   String get id => (_sub['subscription_id'] ?? _sub['id'] ?? '').toString();
   String? get planName => (_sub['plan_name'] ?? _sub['planName']) as String?;
+  String? get productName =>
+      (_sub['product_name'] ?? _sub['productName']) as String?;
   String? get state => (_sub['state'] ?? _sub['status']) as String?;
+  num? get price => _sub['price'] as num?;
+  String? get currency => _sub['currency'] as String?;
 
   factory Subscription.fromJson(Map<String, dynamic> json) =>
       Subscription(json);
@@ -126,4 +130,21 @@ class Payment {
   String? get status => (raw['status'] ?? raw['state']) as String?;
 
   factory Payment.fromJson(Map<String, dynamic> json) => Payment(json);
+}
+
+/// A saved payment method (card on file).
+class PaymentMethod {
+  PaymentMethod(this.raw);
+
+  final Map<String, dynamic> raw;
+
+  String get id => (raw['payment_method_id'] ?? raw['id'] ?? '').toString();
+  bool get isDefault => raw['is_default'] == true;
+  String? get cardBrand => raw['card_brand'] as String?;
+  String? get cardLast4 => (raw['card_last_four'] ?? raw['last4']) as String?;
+  int? get expiryMonth => raw['expiry_month'] as int?;
+  int? get expiryYear => raw['expiry_year'] as int?;
+
+  factory PaymentMethod.fromJson(Map<String, dynamic> json) =>
+      PaymentMethod(json);
 }
