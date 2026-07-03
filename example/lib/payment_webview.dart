@@ -85,6 +85,14 @@ class _PaymentWebViewState extends State<PaymentWebView> {
   }
 
   @override
+  void dispose() {
+    // Stop any in-flight load so the native WebView doesn't keep working after
+    // the page is popped (the post-payment jank we observed).
+    _controller.loadRequest(Uri.parse('about:blank'));
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
