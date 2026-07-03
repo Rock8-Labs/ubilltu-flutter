@@ -4,6 +4,23 @@ description: >-
   authenticate subscribers, browse plans, and manage subscriptions.
 version: 0.3.0
 repository: https://github.com/Rock8-Labs/ubilltu-flutter
+homepage: https://ubilltu.com
+issue_tracker: https://github.com/Rock8-Labs/ubilltu-flutter/issues
+topics:
+  - subscriptions
+  - billing
+  - payments
+  - api-client
+
+# Pure Dart (only depends on http) — runs on every platform Flutter targets
+# and in server-side Dart.
+platforms:
+  android:
+  ios:
+  linux:
+  macos:
+  web:
+  windows:
 
 environment:
   sdk: ^3.5.0

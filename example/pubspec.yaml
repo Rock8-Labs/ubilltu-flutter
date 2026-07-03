@@ -39,6 +39,10 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # Opens the hosted-checkout redirect_url returned by signup/setupPaymentMethod
+  # (example-only — the ubilltu library itself stays pure Dart).
+  url_launcher: ^6.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
