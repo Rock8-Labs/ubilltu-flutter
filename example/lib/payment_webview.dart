@@ -70,7 +70,8 @@ class _PaymentWebViewState extends State<PaymentWebView> {
   /// True once navigation reaches the storefront return_url. Matches on host
   /// (robust to path/query differences on the way back) or the exact prefix.
   bool _isReturn(String url) {
-    debugPrint('[PaymentWebView] nav → $url');
+    // Deliberately not logged: the hosted-payment URL carries a session token
+    // in its query string, which shouldn't land in device logs.
     final target = Uri.tryParse(url);
     final ret = Uri.tryParse(widget.returnUrlPrefix);
     if (target == null || ret == null) return false;
