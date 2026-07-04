@@ -11,10 +11,14 @@ dependencies:
   ubilltu:
     git:
       url: https://github.com/Rock8-Labs/ubilltu-flutter
-      ref: v0.1.0
+      ref: v0.3.0
 ```
 
-(Coming to pub.dev — until then, install from git as above.)
+(Coming to pub.dev — until then, install from git as above.) Then `flutter pub get`.
+
+See [`example/`](example/) for a full runnable app covering auth, plans,
+subscriptions, invoices, and the in-app card/checkout flow, plus
+[`example/TEST-FLOW.md`](example/TEST-FLOW.md) for a step-by-step test pass.
 
 ## Usage
 
