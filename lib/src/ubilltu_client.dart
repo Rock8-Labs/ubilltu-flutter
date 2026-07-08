@@ -101,11 +101,13 @@ class UbilltuClient {
   Future<Map<String, dynamic>> updateAccount(Map<String, dynamic> fields) =>
       _put('/api/v1/account', fields);
 
-  /// The subscriber's account balance.
-  Future<Map<String, dynamic>> balance() => _get('/api/v1/account/balance');
+  /// The subscriber's outstanding balance + available credit.
+  Future<AccountBalance> balance() async =>
+      AccountBalance(await _get('/api/v1/account/balance'));
 
   /// The subscriber's usage metrics.
-  Future<Map<String, dynamic>> usage() => _get('/api/v1/account/usage');
+  Future<UsageMetrics> usage() async =>
+      UsageMetrics(await _get('/api/v1/account/usage'));
 
   /// The subscriber's payment history.
   Future<Page<Payment>> listPayments() async =>
