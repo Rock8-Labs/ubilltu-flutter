@@ -312,3 +312,105 @@ class UsageMetrics {
   factory UsageMetrics.fromJson(Map<String, dynamic> json) =>
       UsageMetrics(json);
 }
+
+/// A member row in the caller's family view (`GET /me/family`).
+class FamilyMember {
+  FamilyMember(this.raw);
+
+  final Map<String, dynamic> raw;
+
+  String get memberId => (raw['member_id'] ?? raw['id'] ?? '').toString();
+  String? get memberEmail => raw['member_email'] as String?;
+  bool get isOwner => raw['is_owner'] == true;
+  String? get joinedDate =>
+      (raw['joined_date'] ?? raw['joinedDate']) as String?;
+
+  /// True for the row representing the calling user (UI highlight).
+  bool get isSelf => raw['is_self'] == true;
+
+  factory FamilyMember.fromJson(Map<String, dynamic> json) =>
+      FamilyMember(json);
+}
+
+/// The caller's family (owner or member view) from `GET /me/family`.
+class Family {
+  Family(this.raw);
+
+  final Map<String, dynamic> raw;
+
+  String get familySubscriptionId =>
+      (raw['family_subscription_id'] ?? raw['familySubscriptionId'] ?? '')
+          .toString();
+  String? get planName => (raw['plan_name'] ?? raw['planName']) as String?;
+  bool get isOwner => raw['is_owner'] == true;
+  String? get ownerName => (raw['owner_name'] ?? raw['ownerName']) as String?;
+  String? get ownerEmail =>
+      (raw['owner_email'] ?? raw['ownerEmail']) as String?;
+  int get totalSeats =>
+      ((raw['total_seats'] ?? raw['totalSeats']) as num?)?.toInt() ?? 0;
+  int get activeMembers =>
+      ((raw['active_members'] ?? raw['activeMembers']) as num?)?.toInt() ?? 0;
+  int get extraSeatsPurchased =>
+      ((raw['extra_seats_purchased'] ?? raw['extraSeatsPurchased']) as num?)
+          ?.toInt() ??
+      0;
+
+  List<FamilyMember> get members {
+    final m = raw['members'];
+    if (m is List) {
+      return m
+          .whereType<Map>()
+          .map((e) => FamilyMember(e.cast<String, dynamic>()))
+          .toList(growable: false);
+    }
+    return const [];
+  }
+
+  /// Seats not yet filled (`totalSeats - activeMembers`, min 0).
+  int get seatsAvailable {
+    final s = totalSeats - activeMembers;
+    return s < 0 ? 0 : s;
+  }
+
+  factory Family.fromJson(Map<String, dynamic> json) => Family(json);
+}
+
+/// A family invite code (`POST`/`GET /me/family/invite(s)`).
+class InviteCode {
+  InviteCode(this.raw);
+
+  final Map<String, dynamic> raw;
+
+  String get code => (raw['code'] ?? '').toString();
+  String? get familySubscriptionId =>
+      (raw['family_subscription_id'] ?? raw['familySubscriptionId']) as String?;
+  String? get createdBy => (raw['created_by'] ?? raw['createdBy']) as String?;
+  String? get createdAt => (raw['created_at'] ?? raw['createdAt']) as String?;
+  String? get expiresAt => (raw['expires_at'] ?? raw['expiresAt']) as String?;
+  int? get maxUses => ((raw['max_uses'] ?? raw['maxUses']) as num?)?.toInt();
+  int get currentUses =>
+      ((raw['current_uses'] ?? raw['currentUses']) as num?)?.toInt() ?? 0;
+  String get status => (raw['status'] ?? 'ACTIVE').toString();
+
+  factory InviteCode.fromJson(Map<String, dynamic> json) => InviteCode(json);
+}
+
+/// Public preview of an invite code (`GET /invite/{code}/validate`).
+class InvitePreview {
+  InvitePreview(this.raw);
+
+  final Map<String, dynamic> raw;
+
+  String? get familySubscriptionId =>
+      (raw['family_subscription_id'] ?? raw['familySubscriptionId']) as String?;
+  String? get planName => (raw['plan_name'] ?? raw['planName']) as String?;
+  String? get ownerName => (raw['owner_name'] ?? raw['ownerName']) as String?;
+  String? get ownerEmail =>
+      (raw['owner_email'] ?? raw['ownerEmail']) as String?;
+  int? get seatsAvailable =>
+      ((raw['seats_available'] ?? raw['seatsAvailable']) as num?)?.toInt();
+  String? get expiresAt => (raw['expires_at'] ?? raw['expiresAt']) as String?;
+
+  factory InvitePreview.fromJson(Map<String, dynamic> json) =>
+      InvitePreview(json);
+}

@@ -211,6 +211,60 @@ class UbilltuClient {
   Future<List<int>> invoicePdf(String invoiceId) =>
       _getBytes('/api/v1/invoices/$invoiceId/pdf');
 
+  // ---------------------------------------------------------------- Family --
+
+  /// The caller's family view (owner or member), or `null` if not in one.
+  Future<Family?> getFamily() async {
+    final fam = (await _get('/api/v1/me/family'))['family'];
+    return fam is Map ? Family(fam.cast<String, dynamic>()) : null;
+  }
+
+  /// Owner removes a member from their family.
+  Future<Map<String, dynamic>> removeFamilyMember(String memberId) =>
+      _post('/api/v1/me/family/members/$memberId/remove', const {});
+
+  /// Leave the family the caller currently belongs to (members only).
+  Future<Map<String, dynamic>> leaveFamily() =>
+      _post('/api/v1/me/family-memberships/leave', const {});
+
+  /// Owner generates a fresh invite code (invalidates any existing one).
+  Future<InviteCode> createFamilyInvite({int expiresInHours = 72}) async {
+    final r = await _post(
+      '/api/v1/me/family/invite',
+      {'expires_in_hours': expiresInHours},
+    );
+    final data = r['data'];
+    return InviteCode(data is Map ? data.cast<String, dynamic>() : const {});
+  }
+
+  /// List invite codes for the caller's owned family.
+  Future<List<InviteCode>> listFamilyInvites() async {
+    final data = (await _get('/api/v1/me/family/invites'))['data'];
+    if (data is List) {
+      return data
+          .whereType<Map>()
+          .map((e) => InviteCode(e.cast<String, dynamic>()))
+          .toList(growable: false);
+    }
+    return const [];
+  }
+
+  /// Owner revokes an invite code.
+  Future<Map<String, dynamic>> revokeFamilyInvite(String code) =>
+      _post('/api/v1/me/family/invite/$code/revoke', const {});
+
+  /// Redeem an invite code to join a family (identity comes from the session).
+  Future<Map<String, dynamic>> acceptFamilyInvite(String code) =>
+      _post('/api/v1/me/family/invite/$code/accept', const {});
+
+  /// Public preview of an invite code (no auth) — for a join page pre-login.
+  Future<InvitePreview> validateInvite(String code) async {
+    final preview =
+        (await _get('/api/v1/invite/$code/validate', auth: false))['preview'];
+    return InvitePreview(
+        preview is Map ? preview.cast<String, dynamic>() : const {});
+  }
+
   // -------------------------------------------------------------- Payments --
 
   /// List the subscriber's saved payment methods (cards on file).
@@ -271,9 +325,11 @@ class UbilltuClient {
     return h;
   }
 
-  Future<Map<String, dynamic>> _get(String path) async {
-    final res =
-        await _http.get(Uri.parse('$baseUrl$path'), headers: _headers());
+  Future<Map<String, dynamic>> _get(String path, {bool auth = true}) async {
+    final res = await _http.get(
+      Uri.parse('$baseUrl$path'),
+      headers: _headers(auth: auth),
+    );
     return _decode(res);
   }
 
