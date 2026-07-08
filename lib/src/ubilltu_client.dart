@@ -113,6 +113,19 @@ class UbilltuClient {
   Future<Page<Payment>> listPayments() async =>
       Page.fromJson(await _get('/api/v1/account/payments'), Payment.fromJson);
 
+  /// Right-to-erasure (GDPR Art. 17 / POPIA s24). Cancels subscriptions, scrubs
+  /// PII, and pseudonymizes the account — IRREVERSIBLE. [confirmEmail] must match
+  /// the account email; [confirmPhrase] must be exactly `"ERASE"`. Returns
+  /// `{erasure_id, erased_fields}`.
+  Future<Map<String, dynamic>> eraseAccount(
+    String confirmEmail, {
+    String confirmPhrase = 'ERASE',
+  }) =>
+      _post('/api/v1/account/erase', {
+        'confirm_email': confirmEmail,
+        'confirm_phrase': confirmPhrase,
+      });
+
   // --------------------------------------------------------------- Plans ----
 
   /// List available plans from the tenant catalog.
@@ -168,6 +181,12 @@ class UbilltuClient {
         await _post('/api/v1/subscriptions/$id/reactivate', const {}),
       );
 
+  /// Whether the customer may self-resume this (paused) subscription (SEC-019).
+  Future<bool> selfResumeAllowed(String id) async {
+    final r = await _get('/api/v1/subscriptions/$id/self-resume-allowed');
+    return r['allowed'] == true;
+  }
+
   /// Change a subscription's plan (upgrade / downgrade / change billing period).
   ///
   /// [newPlanId] is the target plan name — the billing period is encoded in it
@@ -210,6 +229,10 @@ class UbilltuClient {
   /// Download an invoice as PDF bytes.
   Future<List<int>> invoicePdf(String invoiceId) =>
       _getBytes('/api/v1/invoices/$invoiceId/pdf');
+
+  /// Render an invoice as branded HTML (string).
+  Future<String> invoiceHtml(String invoiceId) async =>
+      utf8.decode(await _getBytes('/api/v1/invoices/$invoiceId/html'));
 
   // ---------------------------------------------------------------- Family --
 
@@ -272,6 +295,47 @@ class UbilltuClient {
         await _get('/api/v1/payments/methods'),
         PaymentMethod.fromJson,
       );
+
+  /// Save a payment method from a PSP card token.
+  Future<PaymentMethod> addPaymentMethod(
+    String cardToken, {
+    bool isDefault = false,
+  }) async =>
+      PaymentMethod(await _post('/api/v1/payments/methods', {
+        'card_token': cardToken,
+        'is_default': isDefault,
+      }));
+
+  /// Remove a saved payment method (re-promotes another card if it was default).
+  Future<void> deletePaymentMethod(String methodId) =>
+      _delete('/api/v1/payments/methods/$methodId');
+
+  /// Make a saved payment method the account default.
+  Future<Map<String, dynamic>> setDefaultPaymentMethod(String methodId) =>
+      _put('/api/v1/payments/methods/$methodId/default', const {});
+
+  /// Ensure the account default points at a real, chargeable card.
+  Future<Map<String, dynamic>> reconcileDefaultPaymentMethod() =>
+      _post('/api/v1/payments/methods/reconcile-default', const {});
+
+  /// Fetch a single payment's live status (reconciles PENDING with the gateway).
+  Future<Payment> getPayment(String paymentId) async =>
+      Payment(await _get('/api/v1/payments/$paymentId'));
+
+  /// Make an ad-hoc / one-off payment. [source] describes what to pay
+  /// (`{type: 'ad_hoc', amount, currency, description}`, or `{type: 'invoice',
+  /// invoice_id}` / `{type: 'addon', plan_id}`); [settlement] describes how
+  /// (`{mode: 'saved', payment_method_id}` or `{mode: 'hosted', return_url}`).
+  /// Returns the raw response (`status`, `requires_redirect`, `redirect_url`,
+  /// `payment_id`).
+  Future<Map<String, dynamic>> createOneOffPayment(
+    Map<String, dynamic> source,
+    Map<String, dynamic> settlement,
+  ) =>
+      _post('/api/v1/payments/one-off', {
+        'source': source,
+        'settlement': settlement,
+      });
 
   /// Start a zero-amount card-on-file setup. Returns `{redirect_url}` — send the
   /// customer to that hosted page to enter their card.
