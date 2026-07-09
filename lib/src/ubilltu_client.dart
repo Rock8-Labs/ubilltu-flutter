@@ -49,7 +49,7 @@ class UbilltuClient {
     final data = await _post(
       '/api/v1/auth/login',
       {'email': email, 'password': password},
-      auth: false,
+      auth: 'none',
     );
     return _tokens = UbilltuTokens.fromJson(data);
   }
@@ -72,7 +72,7 @@ class UbilltuClient {
         'tos_accepted': tosAccepted,
         if (name != null) 'name': name,
       },
-      auth: false,
+      auth: 'none',
     );
     final tokens = UbilltuTokens.fromJson(data);
     if (tokens.accessToken.isNotEmpty) _tokens = tokens;
@@ -84,7 +84,7 @@ class UbilltuClient {
     final rt = _tokens?.refreshToken;
     if (rt == null) throw UbilltuAuthException('No refresh token available.');
     final data =
-        await _post('/api/v1/auth/refresh', {'refresh_token': rt}, auth: false);
+        await _post('/api/v1/auth/refresh', {'refresh_token': rt}, auth: 'none');
     return _tokens = UbilltuTokens.fromJson(data);
   }
 
@@ -131,16 +131,17 @@ class UbilltuClient {
 
   // --------------------------------------------------------------- Plans ----
 
-  /// List available plans from the tenant catalog.
+  /// List available plans. PUBLIC — works before [login] (the storefront slug is
+  /// enough; the token is attached only if present).
   Future<Page<Plan>> listPlans({int? page, int? perPage}) async =>
       Page.fromJson(
-        await _get('/api/v1/plans${_pageQuery(page, perPage)}'),
+        await _get('/api/v1/plans${_pageQuery(page, perPage)}', auth: 'optional'),
         Plan.fromJson,
       );
 
-  /// Fetch a single plan by id.
+  /// Fetch a single plan by id. PUBLIC — works before [login].
   Future<Plan> getPlan(String planId) async =>
-      Plan.fromJson(await _get('/api/v1/plans/$planId'));
+      Plan.fromJson(await _get('/api/v1/plans/$planId', auth: 'optional'));
 
   // ------------------------------------------------------- Subscriptions ----
 
@@ -166,21 +167,26 @@ class UbilltuClient {
     return Subscription.fromJson(data);
   }
 
-  /// Cancel a subscription.
-  Future<void> cancelSubscription(String id) =>
-      _delete('/api/v1/subscriptions/$id');
+  /// Cancel a subscription. [policy] defaults to `END_OF_TERM` — the subscription
+  /// keeps access until the period ends and reads as "Cancelling" (reactivatable).
+  /// Pass `'IMMEDIATE'` to cancel now, or `null` to use the server default.
+  Future<Map<String, dynamic>> cancelSubscription(
+    String id, {
+    String? policy = 'END_OF_TERM',
+  }) async =>
+      _decode(await _send(
+        'DELETE',
+        '/api/v1/subscriptions/$id',
+        body: policy != null ? {'use_policy': policy} : null,
+      ));
 
-  /// Pause a subscription.
-  Future<Subscription> pauseSubscription(String id) async =>
-      Subscription.fromJson(
-        await _post('/api/v1/subscriptions/$id/pause', const {}),
-      );
+  /// Pause a subscription (schedules pause at end of period).
+  Future<PauseResult> pauseSubscription(String id) async =>
+      PauseResult(await _post('/api/v1/subscriptions/$id/pause', const {}));
 
   /// Resume a paused subscription.
-  Future<Subscription> resumeSubscription(String id) async =>
-      Subscription.fromJson(
-        await _post('/api/v1/subscriptions/$id/resume', const {}),
-      );
+  Future<PauseResult> resumeSubscription(String id) async =>
+      PauseResult(await _post('/api/v1/subscriptions/$id/resume', const {}));
 
   /// Reactivate a cancelled subscription.
   Future<Subscription> reactivateSubscription(String id) async =>
@@ -293,7 +299,7 @@ class UbilltuClient {
   /// Public preview of an invite code (no auth) — for a join page pre-login.
   Future<InvitePreview> validateInvite(String code) async {
     final preview =
-        (await _get('/api/v1/invite/$code/validate', auth: false))['preview'];
+        (await _get('/api/v1/invite/$code/validate', auth: 'none'))['preview'];
     return InvitePreview(
         preview is Map ? preview.cast<String, dynamic>() : const {});
   }
@@ -386,17 +392,17 @@ class UbilltuClient {
 
   // ----------------------------------------------------------- internals ----
 
-  Map<String, String> _headers({bool json = false, bool auth = true}) {
+  /// [auth]: `'required'` (attach token, throw if missing), `'optional'`
+  /// (attach if present), or `'none'` (never attach).
+  Map<String, String> _headers({bool json = false, String auth = 'required'}) {
     final h = <String, String>{
       'X-Storefront-Slug': storefrontSlug,
       'Accept': 'application/json',
     };
     if (json) h['Content-Type'] = 'application/json';
-    if (auth) {
-      final t = _tokens?.accessToken;
-      if (t == null || t.isEmpty) throw UbilltuAuthException();
-      h['Authorization'] = 'Bearer $t';
-    }
+    final t = _tokens?.accessToken;
+    if (auth == 'required' && (t == null || t.isEmpty)) throw UbilltuAuthException();
+    if (auth != 'none' && t != null && t.isNotEmpty) h['Authorization'] = 'Bearer $t';
     return h;
   }
 
@@ -408,42 +414,73 @@ class UbilltuClient {
     return parts.isEmpty ? '' : '?${parts.join('&')}';
   }
 
-  Future<Map<String, dynamic>> _get(String path, {bool auth = true}) async {
-    final res = await _http.get(
-      Uri.parse('$baseUrl$path'),
-      headers: _headers(auth: auth),
-    );
-    return _decode(res);
+  Future<http.Response> _rawSend(
+    String method,
+    String path, {
+    String? body,
+    required String auth,
+  }) {
+    final uri = Uri.parse('$baseUrl$path');
+    final headers = _headers(json: body != null, auth: auth);
+    switch (method) {
+      case 'GET':
+        return _http.get(uri, headers: headers);
+      case 'POST':
+        return _http.post(uri, headers: headers, body: body);
+      case 'PUT':
+        return _http.put(uri, headers: headers, body: body);
+      case 'DELETE':
+        return _http.delete(uri, headers: headers, body: body);
+      default:
+        throw UbilltuException('Unsupported method $method');
+    }
   }
+
+  /// Send a request, transparently refreshing the token once on a 401 (docs
+  /// recommend refresh-on-401) when a refresh token is present.
+  Future<http.Response> _send(
+    String method,
+    String path, {
+    Map<String, dynamic>? body,
+    String auth = 'required',
+    bool retry = true,
+  }) async {
+    final encoded = body != null ? jsonEncode(body) : null;
+    var res = await _rawSend(method, path, body: encoded, auth: auth);
+    if (res.statusCode == 401 &&
+        retry &&
+        auth != 'none' &&
+        (_tokens?.refreshToken?.isNotEmpty ?? false)) {
+      var refreshed = false;
+      try {
+        await refresh();
+        refreshed = true;
+      } catch (_) {
+        // fall through and surface the original 401
+      }
+      if (refreshed) res = await _rawSend(method, path, body: encoded, auth: auth);
+    }
+    return res;
+  }
+
+  Future<Map<String, dynamic>> _get(String path, {String auth = 'required'}) async =>
+      _decode(await _send('GET', path, auth: auth));
 
   Future<Map<String, dynamic>> _post(
     String path,
     Map<String, dynamic> body, {
-    bool auth = true,
-  }) async {
-    final res = await _http.post(
-      Uri.parse('$baseUrl$path'),
-      headers: _headers(json: true, auth: auth),
-      body: jsonEncode(body),
-    );
-    return _decode(res);
-  }
+    String auth = 'required',
+  }) async =>
+      _decode(await _send('POST', path, body: body, auth: auth));
 
   Future<Map<String, dynamic>> _put(
     String path,
     Map<String, dynamic> body,
-  ) async {
-    final res = await _http.put(
-      Uri.parse('$baseUrl$path'),
-      headers: _headers(json: true),
-      body: jsonEncode(body),
-    );
-    return _decode(res);
-  }
+  ) async =>
+      _decode(await _send('PUT', path, body: body));
 
   Future<List<int>> _getBytes(String path) async {
-    final res =
-        await _http.get(Uri.parse('$baseUrl$path'), headers: _headers());
+    final res = await _send('GET', path);
     if (res.statusCode < 200 || res.statusCode >= 300) {
       _decode(res); // throws UbilltuApiException
     }
@@ -451,9 +488,7 @@ class UbilltuClient {
   }
 
   Future<void> _delete(String path) async {
-    final res =
-        await _http.delete(Uri.parse('$baseUrl$path'), headers: _headers());
-    _decode(res, allowEmpty: true);
+    _decode(await _send('DELETE', path), allowEmpty: true);
   }
 
   Map<String, dynamic> _decode(http.Response res, {bool allowEmpty = false}) {

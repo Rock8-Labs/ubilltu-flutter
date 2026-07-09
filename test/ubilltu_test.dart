@@ -43,7 +43,8 @@ void main() {
         storefrontSlug: 'demo',
         httpClient: MockClient((_) async => _json(const {})),
       );
-      expect(client.listPlans(), throwsA(isA<UbilltuAuthException>()));
+      // listPlans is public; use a genuinely authed endpoint.
+      expect(client.listSubscriptions(), throwsA(isA<UbilltuAuthException>()));
     });
 
     test('non-2xx maps to UbilltuApiException with status + detail', () async {

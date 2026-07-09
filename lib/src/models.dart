@@ -275,6 +275,22 @@ class PaymentMethod {
       PaymentMethod(json);
 }
 
+/// Result of a pause/resume (`{success, message, paused_until}`).
+class PauseResult {
+  PauseResult(this.raw);
+
+  final Map<String, dynamic> raw;
+
+  bool get success => raw['success'] == true;
+  String? get message => raw['message'] as String?;
+
+  /// When the pause takes effect (end of the current period), if scheduled.
+  String? get pausedUntil =>
+      (raw['paused_until'] ?? raw['pausedUntil']) as String?;
+
+  factory PauseResult.fromJson(Map<String, dynamic> json) => PauseResult(json);
+}
+
 /// Outstanding balance + available credit for the account.
 class AccountBalance {
   AccountBalance(this.raw);
