@@ -313,6 +313,21 @@ class UsageMetrics {
       UsageMetrics(json);
 }
 
+/// Best-effort subscription price. A subscription's [Subscription.price] can come
+/// back null from the API (findings #5); when it does, derive it from the
+/// matching plan in [plans] (matched on the plan slug/name). Returns `null` if
+/// it can't be resolved.
+num? resolveSubscriptionPrice(Subscription subscription, List<Plan> plans) {
+  if (subscription.price != null) return subscription.price;
+  final name = subscription.planName;
+  if (name != null) {
+    for (final p in plans) {
+      if (p.id == name || p.name == name) return p.price;
+    }
+  }
+  return null;
+}
+
 /// A member row in the caller's family view (`GET /me/family`).
 class FamilyMember {
   FamilyMember(this.raw);

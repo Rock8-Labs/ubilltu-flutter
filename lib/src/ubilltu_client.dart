@@ -110,8 +110,11 @@ class UbilltuClient {
       UsageMetrics(await _get('/api/v1/account/usage'));
 
   /// The subscriber's payment history.
-  Future<Page<Payment>> listPayments() async =>
-      Page.fromJson(await _get('/api/v1/account/payments'), Payment.fromJson);
+  Future<Page<Payment>> listPayments({int? page, int? perPage}) async =>
+      Page.fromJson(
+        await _get('/api/v1/account/payments${_pageQuery(page, perPage)}'),
+        Payment.fromJson,
+      );
 
   /// Right-to-erasure (GDPR Art. 17 / POPIA s24). Cancels subscriptions, scrubs
   /// PII, and pseudonymizes the account — IRREVERSIBLE. [confirmEmail] must match
@@ -129,8 +132,11 @@ class UbilltuClient {
   // --------------------------------------------------------------- Plans ----
 
   /// List available plans from the tenant catalog.
-  Future<Page<Plan>> listPlans() async =>
-      Page.fromJson(await _get('/api/v1/plans'), Plan.fromJson);
+  Future<Page<Plan>> listPlans({int? page, int? perPage}) async =>
+      Page.fromJson(
+        await _get('/api/v1/plans${_pageQuery(page, perPage)}'),
+        Plan.fromJson,
+      );
 
   /// Fetch a single plan by id.
   Future<Plan> getPlan(String planId) async =>
@@ -139,8 +145,9 @@ class UbilltuClient {
   // ------------------------------------------------------- Subscriptions ----
 
   /// List the subscriber's subscriptions.
-  Future<Page<Subscription>> listSubscriptions() async => Page.fromJson(
-        await _get('/api/v1/subscriptions'),
+  Future<Page<Subscription>> listSubscriptions({int? page, int? perPage}) async =>
+      Page.fromJson(
+        await _get('/api/v1/subscriptions${_pageQuery(page, perPage)}'),
         Subscription.fromJson,
       );
 
@@ -219,8 +226,11 @@ class UbilltuClient {
   // ------------------------------------------------------------ Invoices ----
 
   /// List the subscriber's invoices.
-  Future<Page<Invoice>> listInvoices() async =>
-      Page.fromJson(await _get('/api/v1/invoices'), Invoice.fromJson);
+  Future<Page<Invoice>> listInvoices({int? page, int? perPage}) async =>
+      Page.fromJson(
+        await _get('/api/v1/invoices${_pageQuery(page, perPage)}'),
+        Invoice.fromJson,
+      );
 
   /// Fetch a single invoice with line-item detail.
   Future<Map<String, dynamic>> getInvoice(String invoiceId) =>
@@ -291,8 +301,9 @@ class UbilltuClient {
   // -------------------------------------------------------------- Payments --
 
   /// List the subscriber's saved payment methods (cards on file).
-  Future<Page<PaymentMethod>> listPaymentMethods() async => Page.fromJson(
-        await _get('/api/v1/payments/methods'),
+  Future<Page<PaymentMethod>> listPaymentMethods({int? page, int? perPage}) async =>
+      Page.fromJson(
+        await _get('/api/v1/payments/methods${_pageQuery(page, perPage)}'),
         PaymentMethod.fromJson,
       );
 
@@ -387,6 +398,14 @@ class UbilltuClient {
       h['Authorization'] = 'Bearer $t';
     }
     return h;
+  }
+
+  /// Build a `?page=&per_page=` suffix (empty when nothing is set).
+  String _pageQuery(int? page, int? perPage) {
+    final parts = <String>[];
+    if (page != null) parts.add('page=$page');
+    if (perPage != null) parts.add('per_page=$perPage');
+    return parts.isEmpty ? '' : '?${parts.join('&')}';
   }
 
   Future<Map<String, dynamic>> _get(String path, {bool auth = true}) async {
